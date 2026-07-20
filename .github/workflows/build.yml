@@ -187,6 +187,23 @@ jobs:
           echo ""
           echo "✓ Key properties configured"
 
+      - name: Create Debug Keystore
+        run: |
+          echo "🔑 Creating debug keystore..."
+          keytool -genkeypair \
+            -keystore debug.keystore \
+            -storepass android \
+            -keypass android \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" \
+            -noprompt
+          
+          echo "✓ Debug keystore created"
+          ls -lh debug.keystore
+
       - name: Grant Permission to Gradle
         run: |
           echo "🔐 Setting up gradle permissions..."
