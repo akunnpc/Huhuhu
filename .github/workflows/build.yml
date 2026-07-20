@@ -17,6 +17,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Debug - Show Initial Directory
         run: |
           echo "📁 Initial directory contents:"
@@ -145,32 +148,44 @@ jobs:
           echo "✓ local.properties created:"
           cat local.properties
 
-      - name: Create key.properties
+      - name: Generate Secure Keystore
         run: |
-          echo "📝 Creating key.properties..."
+          echo "🔑 Generating secure keystore..."
+          
+          # Generate random passwords dan alias
+          STORE_PASSWORD=$(openssl rand -base64 32)
+          KEY_PASSWORD=$(openssl rand -base64 32)
+          KEY_ALIAS="key_$(openssl rand -hex 8)"
+          
+          echo "Creating key.properties with generated credentials..."
           cat > key.properties <<EOF
-          storePassword=dummy123
-          keyPassword=dummy123
-          keyAlias=dummy
-          storeFile=dummy.keystore
+          storePassword=$STORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=release.keystore
           EOF
+          
           echo "✓ key.properties created"
-
-      - name: Generate Dummy Keystore
-        run: |
-          echo "🔑 Generating dummy keystore..."
+          
+          echo ""
+          echo "🔑 Generating keystore with keytool..."
           keytool -genkeypair \
-            -keystore dummy.keystore \
-            -storepass dummy123 \
-            -keypass dummy123 \
-            -alias dummy \
-            -dname "CN=GitHub,O=Actions,C=ID" \
+            -keystore release.keystore \
+            -storepass "$STORE_PASSWORD" \
+            -keypass "$KEY_PASSWORD" \
+            -alias "$KEY_ALIAS" \
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000 \
+            -dname "CN=GitHub Actions,O=Build,OU=Android,C=ID" \
             -noprompt
+          
           echo "✓ Keystore generated successfully"
-          ls -lh dummy.keystore
+          ls -lh release.keystore
+          
+          # Show key.properties (passwords are already hashed in keystore)
+          echo ""
+          echo "✓ Key properties configured"
 
       - name: Grant Permission to Gradle
         run: |
