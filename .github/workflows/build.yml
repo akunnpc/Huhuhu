@@ -20,20 +20,41 @@ jobs:
 
       - name: Extract Project
         run: |
-          unzip "*.zip" -d project
-          ls -R project
+          if [ -f "*.zip" ]; then
+            unzip -q *.zip -d project
+            echo "✓ ZIP extracted successfully"
+          else
+            echo "⚠ No ZIP file found, checking for existing project structure..."
+          fi
+          ls -la
 
-      - name: Move Project
+      - name: Move Project (if ZIP exists)
         run: |
-          PROJECT_DIR=$(find project -mindepth 1 -maxdepth 1 -type d | head -n 1)
-          cp -r "$PROJECT_DIR"/* .
-          cp -r "$PROJECT_DIR"/.[^.]* . 2>/dev/null || true
+          if [ -d "project" ]; then
+            PROJECT_DIR=$(find project -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            if [ -n "$PROJECT_DIR" ]; then
+              cp -r "$PROJECT_DIR"/* .
+              cp -r "$PROJECT_DIR"/.[^.]* . 2>/dev/null || true
+              echo "✓ Project moved to workspace"
+              rm -rf project
+            fi
+          fi
+
+      - name: Verify Project Structure
+        run: |
+          if [ ! -f "build.gradle" ] && [ ! -f "build.gradle.kts" ]; then
+            echo "❌ Error: build.gradle not found!"
+            ls -la
+            exit 1
+          fi
+          echo "✓ Project structure verified"
 
       - name: Create local.properties
         run: |
           echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          cat local.properties
 
-      - name: Create random key.properties
+      - name: Create key.properties
         run: |
           cat > key.properties <<EOF
           storePassword=dummy123
@@ -53,15 +74,32 @@ jobs:
             -keyalg RSA \
             -keysize 2048 \
             -validity 10000
+          echo "✓ Keystore generated"
 
-      - name: Grant Permission
-        run: chmod +x gradlew
+      - name: Grant Permission to Gradle
+        run: |
+          if [ -f "gradlew" ]; then
+            chmod +x gradlew
+            echo "✓ gradlew permission granted"
+          else
+            echo "⚠ gradlew not found, using system gradle"
+          fi
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          if [ -f "gradlew" ]; then
+            ./gradlew assembleDebug --stacktrace
+          else
+            gradle assemble --stacktrace
+          fi
+
+      - name: List Build Outputs
+        run: find . -name "*.apk" -type f 2>/dev/null
 
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Debug-APK
-          path: app/build/outputs/apk/debug/*.apk
+          path: "**/build/outputs/apk/*/*.apk"
+          if-no-files-found: warn
