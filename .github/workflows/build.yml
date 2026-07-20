@@ -25,25 +25,34 @@ jobs:
           else
             echo "⚠ No ZIP file found, checking for existing project structure..."
           fi
-          ls -la
+          ls -la project/ 2>/dev/null || true
 
       - name: Move Project (if ZIP exists)
         run: |
           if [ -d "project" ]; then
-            PROJECT_DIR=$(find project -mindepth 1 -maxdepth 1 -type d | head -n 1)
-            if [ -n "$PROJECT_DIR" ]; then
-              cp -r "$PROJECT_DIR"/* .
-              cp -r "$PROJECT_DIR"/.[^.]* . 2>/dev/null || true
-              echo "✓ Project moved to workspace"
-              rm -rf project
+            # Cek apakah ada subdirectory atau langsung ada build.gradle
+            if [ -f "project/build.gradle" ] || [ -f "project/build.gradle.kts" ]; then
+              # Structure: project/build.gradle (langsung)
+              cp -r project/* .
+              cp -r project/.[^.]* . 2>/dev/null || true
+            else
+              # Structure: project/subfolder/build.gradle (ada subfolder)
+              PROJECT_DIR=$(find project -mindepth 1 -maxdepth 1 -type d | head -n 1)
+              if [ -n "$PROJECT_DIR" ]; then
+                cp -r "$PROJECT_DIR"/* .
+                cp -r "$PROJECT_DIR"/.[^.]* . 2>/dev/null || true
+              fi
             fi
+            rm -rf project
+            echo "✓ Project moved to workspace"
           fi
 
       - name: Verify Project Structure
         run: |
+          echo "📁 Isi directory saat ini:"
+          ls -la
           if [ ! -f "build.gradle" ] && [ ! -f "build.gradle.kts" ]; then
-            echo "❌ Error: build.gradle not found!"
-            ls -la
+            echo "❌ Error: build.gradle tidak ditemukan!"
             exit 1
           fi
           echo "✓ Project structure verified"
